@@ -1,37 +1,44 @@
-import { prisma } from "@/lib/prisma"; 
+import { prisma } from "@/lib/prisma";
 import VehicleCard from "@/components/storefront/VehicleCard";
 
-// This tells Next.js to fetch fresh data every time someone visits the page
-export const dynamic = "force-dynamic";
+interface HomeProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
 
-export default async function StorefrontPage() {
-  // Fetch vehicles directly from your database
-  // Note: If your database uses a different table name (like "vehicule" in French), 
-  // you might need to change "prisma.vehicle" to match your schema.
-  const vehicles = await prisma.vehicle.findMany();
+export default async function StorefrontHomePage({ searchParams }: HomeProps) {
+  const resolvedParams = await searchParams;
+  const category = resolvedParams?.category as string | undefined;
 
-  // If there are no cars in the database yet, show a friendly message
-  if (vehicles.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[50vh]">
-        <h2 className="text-2xl font-bold text-gray-700">No cars found</h2>
-        <p className="text-gray-500 mt-2">Check back later for available vehicles!</p>
-      </div>
-    );
+  // FIX: Start with an empty query so ALL cars from your admin panel show up
+  let query: any = {};
+
+  if (category) {
+    query.category = category;
   }
 
-  // Display the cars in a responsive grid, exactly like Airbnb
+  // Fetch the cars from the database
+  const vehicles = await (prisma as any).vehicle.findMany({
+    where: query,
+    orderBy: {
+      createdAt: 'desc' 
+    }
+  });
+
   return (
-    <div className="max-w-[2520px] mx-auto xl:px-20 md:px-10 sm:px-2 px-4 py-10">
-      <h1 className="text-3xl font-bold mb-8">Our Fleet</h1>
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-8">
-        {vehicles.map((vehicle: any) => (
-          <VehicleCard 
-            key={vehicle.id} 
-            data={vehicle} 
-          />
-        ))}
+    <div className="max-w-[2520px] mx-auto xl:px-20 md:px-10 sm:px-2 px-4">
+      <div className="pt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-8">
+        
+        {vehicles.length === 0 ? (
+          <div className="col-span-full h-[50vh] flex flex-col items-center justify-center text-neutral-500">
+            <h2 className="text-2xl font-semibold text-neutral-800">No cars found</h2>
+            <p className="font-light mt-2">Try selecting a different category.</p>
+          </div>
+        ) : (
+          vehicles.map((vehicle: any) => (
+            <VehicleCard key={vehicle.id} data={vehicle} />
+          ))
+        )}
+
       </div>
     </div>
   );

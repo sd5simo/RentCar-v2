@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "@/styles/globals.css";
+
+// The correct import based on your tsconfig.json mapping!
+import "../styles/globals.css";
 
 const inter = Inter({
   subsets: ["latin"],

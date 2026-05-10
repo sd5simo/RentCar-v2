@@ -19,8 +19,29 @@ export default function BookingWidget({ vehicleId, dailyRate }: BookingWidgetPro
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
 
+  // --- AUTOMATIC PRICE ESTIMATE LOGIC ---
+  let totalDays = 0;
+  let totalPrice = 0;
+
+  if (startDate && endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = end.getTime() - start.getTime();
+    
+    // Convert the time difference into days
+    totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // Make sure they didn't pick an end date BEFORE the start date!
+    if (totalDays > 0) {
+      totalPrice = totalDays * dailyRate;
+    } else {
+      totalDays = 0; 
+    }
+  }
+
   const handleReserve = async () => {
     if (!startDate || !endDate) return alert("Please select dates!");
+    if (totalDays <= 0) return alert("Your drop-off date must be after your pick-up date!");
     
     setIsLoading(true);
     try {
@@ -33,6 +54,7 @@ export default function BookingWidget({ vehicleId, dailyRate }: BookingWidgetPro
           endDate,
           clientName,
           clientPhone,
+          dailyRate, // We send this so the backend API knows how much to charge!
         }),
       });
 
@@ -102,7 +124,21 @@ export default function BookingWidget({ vehicleId, dailyRate }: BookingWidgetPro
         </div>
       </div>
 
-      <hr className="my-4"/>
+      {/* --- PRICE BREAKDOWN RECEIPT --- */}
+      {totalDays > 0 && (
+        <div className="py-4">
+          <div className="flex flex-row items-center justify-between font-light text-neutral-600 mb-2">
+            <div>${dailyRate} x {totalDays} {totalDays === 1 ? 'day' : 'days'}</div>
+            <div>${totalPrice}</div>
+          </div>
+          <hr className="my-2" />
+          <div className="flex flex-row items-center justify-between font-semibold text-lg mt-2">
+            <div>Total</div>
+            <div>${totalPrice}</div>
+          </div>
+        </div>
+      )}
+      {!totalDays && <hr className="my-4"/>}
 
       <button 
         onClick={handleReserve}

@@ -96,7 +96,7 @@ export default function VehicleDetailPage() {
   };
 
   const F = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
-
+  
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Header */}

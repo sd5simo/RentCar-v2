@@ -5,23 +5,57 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     
-    // The data coming from our BookingWidget
-    const { vehicleId, startDate, endDate, clientName, clientPhone } = body;
+    // The details we get from the BookingWidget
+    const { vehicleId, startDate, endDate, clientName, clientPhone, dailyRate } = body;
 
-    // Just in case Prisma wants a Number instead of a String for the ID!
-    const formattedVehicleId = isNaN(Number(vehicleId)) ? vehicleId : Number(vehicleId);
+    // 1. Calculate the Total Amount
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    // Calculate how many days they are renting
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; 
+    
+    // Calculate the total price
+    const rate = Number(dailyRate) || 0; 
+    const totalAmount = totalDays * rate;
 
-    // We use (prisma as any) to temporarily bypass TypeScript's red squiggly lines 
-    // so we can test if the database actually accepts it!
-    const newReservation = await (prisma as any).reservation.create({
+    // 2. Handle the Client
+    // We split the single name input into First and Last name
+    const [firstName, ...lastNameParts] = (clientName || "Public").split(" ");
+    const lastName = lastNameParts.join(" ") || "Client";
+
+    // Because your database REQUIRES a 'cin' (ID Card), we generate a temporary one
+    // so the booking doesn't crash. The admin can update it later!
+    const tempCin = `PUB-${Date.now().toString().slice(-6)}`; 
+    
+    // Try to see if this customer already exists by phone number
+    let client = await prisma.client.findFirst({
+        where: { phone: clientPhone }
+    });
+
+    // If they don't exist, create a new client profile for them
+    if (!client) {
+        client = await prisma.client.create({
+            data: {
+                cin: tempCin, 
+                firstName: firstName,
+                lastName: lastName,
+                phone: clientPhone || "0000000000",
+            }
+        });
+    }
+
+    // 3. Create the Reservation with ALL required fields
+    const newReservation = await prisma.reservation.create({
       data: {
-        vehicleId: formattedVehicleId,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        status: "PENDING", 
-        // If your database requires client details, uncomment these:
-        // clientName: clientName, 
-        // clientPhone: clientPhone,
+        refCode: `RES-${Date.now().toString().slice(-6)}`, // Generate a random Ref Code
+        clientId: client.id,                               // Attach it to our new client
+        vehicleId: vehicleId,
+        startDate: start,
+        endDate: end,
+        totalAmount: totalAmount,                          // Required by DB
+        status: "PENDING",                                 // Admin will approve it later
+        notes: "Booked via Public Storefront",
       }
     });
 

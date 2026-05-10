@@ -52,6 +52,7 @@ model Vehicle {
   insuranceExpiry         DateTime?
   vignetteExpiry          DateTime?
   notes                   String?
+  imageUrl                String?   // <--- ADD THIS LINE HERE!
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 

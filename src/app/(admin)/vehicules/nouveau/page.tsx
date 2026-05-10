@@ -42,7 +42,7 @@ export default function NouveauVehiculePage() {
   });
 
   const isValid = form.plate && form.brand && form.model && form.dailyRate;
-
+  
   const handleSubmit = () => {
     if (!isValid) return;
     addVehicle({
