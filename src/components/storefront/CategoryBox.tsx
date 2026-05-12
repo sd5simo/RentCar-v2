@@ -1,51 +1,41 @@
-"use client";
+import React from 'react';
+import { Plane, CalendarDays, MapPin, Truck, Building2, Car } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
+const categories = [
+  { id: 'all', label: 'All', icon: Car },
+  { id: 'airports', label: 'Airports', icon: Plane },
+  { id: 'monthly', label: 'Monthly', icon: CalendarDays },
+  { id: 'nearby', label: 'Nearby', icon: MapPin },
+  { id: 'delivered', label: 'Delivered', icon: Truck },
+  { id: 'cities', label: 'Cities', icon: Building2 },
+];
 
-interface CategoryBoxProps {
-  label: string;
-  selected?: boolean;
-}
-
-export default function CategoryBox({ label, selected }: CategoryBoxProps) {
-  const router = useRouter();
-  const params = useSearchParams();
-
-  // This handles adding the category to the URL safely
-  const handleClick = useCallback(() => {
-    let currentQuery = {};
-    
-    if (params) {
-      currentQuery = Object.fromEntries(params.entries());
-    }
-
-    const updatedQuery: any = {
-      ...currentQuery,
-      category: label
-    };
-
-    // If they click the same category again, it turns the filter off
-    if (params?.get("category") === label) {
-      delete updatedQuery.category;
-    }
-
-    const url = new URLSearchParams(updatedQuery).toString();
-    router.push(`/?${url}`);
-  }, [label, params, router]);
+export const CategoryFilter: React.FC = () => {
+  const [active, setActive] = React.useState('all');
 
   return (
-    <div
-      onClick={handleClick}
-      className={`
-        flex flex-col items-center justify-center gap-2 p-3 border-b-2 hover:text-neutral-800 transition cursor-pointer
-        ${selected ? "border-neutral-800 text-neutral-800" : "border-transparent text-neutral-500"}
-      `}
-    >
-      {/* We will just use text for now to keep it clean, but you can add icons later! */}
-      <div className="font-medium text-sm">
-        {label}
-      </div>
+    <div className="flex items-center justify-center gap-2 md:gap-4 overflow-x-auto pb-4 px-4 no-scrollbar">
+      {categories.map((cat) => {
+        const Icon = cat.icon;
+        const isActive = active === cat.id;
+        
+        return (
+          <button
+            key={cat.id}
+            onClick={() => setActive(cat.id)}
+            className={cn(
+              "flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium transition-all whitespace-nowrap",
+              isActive 
+                ? "bg-black text-white shadow-lg" 
+                : "bg-transparent text-gray-700 hover:bg-gray-100"
+            )}
+          >
+            <Icon className="w-4 h-4" />
+            {cat.label}
+          </button>
+        );
+      })}
     </div>
   );
-}
+};

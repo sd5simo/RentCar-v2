@@ -1,76 +1,119 @@
+import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
-import VehicleCard from "@/components/storefront/VehicleCard";
-import HeroSearch from "@/components/storefront/HeroSearch";
+import StorefrontClient, { Car } from "@/components/storefront/StorefrontClient";
 
-interface HomeProps {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+/* ─────────────────────────────────────────────
+   Types
+───────────────────────────────────────────── */
+interface PageProps {
+  searchParams?: Promise<{
+    location?: string;
+    start?: string;
+    end?: string;
+    category?: string;
+  }>;
 }
 
-export default async function StorefrontHomePage({ searchParams }: HomeProps) {
-  const resolvedParams = await searchParams;
-  const category = resolvedParams?.category as string | undefined;
+/* ─────────────────────────────────────────────
+   Data Fetching
+───────────────────────────────────────────── */
+async function getCars(start?: string, end?: string): Promise<Car[]> {
+  let bookedCarIds: string[] = [];
 
-  // 1. UPDATED QUERY: Only show cars that are AVAILABLE
-  let query: any = {
-    status: "AVAILABLE", // This filters for available cars only
-  };
-  
-  if (category) query.category = category;
+  // 1. Chercher les conflits dans les Réservations et Locations (Noms corrigés !)
+  if (start && end) {
+    const reservations = await prisma.reservation.findMany({
+      where: {
+        status: { in: ["CONFIRMED", "PENDING"] },
+        OR: [{ startDate: { lte: new Date(end) }, endDate: { gte: new Date(start) } }],
+      },
+      select: { vehicleId: true },
+    });
 
-  const vehicles = await (prisma as any).vehicle.findMany({
-    where: query,
+    const rentals = await prisma.rental.findMany({
+      where: {
+        status: "ACTIVE",
+        OR: [{ startDate: { lte: new Date(end) }, endDate: { gte: new Date(start) } }],
+      },
+      select: { vehicleId: true },
+    });
+
+    bookedCarIds = [...reservations.map((r: any) => r.vehicleId), ...rentals.map((r: any) => r.vehicleId)];
+  }
+
+  // 2. Fetch depuis la table VEHICLE (et non car)
+  const vehicles = await prisma.vehicle.findMany({
     orderBy: { createdAt: 'desc' }
   });
 
+  return vehicles.map((car: any) => {
+    const isUnavailableForDates = bookedCarIds.includes(car.id);
+
+    return {
+      id: car.id,
+      name: `${car.brand} ${car.model} ${car.year}`,
+      brand: car.brand,
+      model: car.model,
+      year: car.year,
+      category: car.category,
+      pricePerDay: car.dailyRate, // Adapté à votre schéma
+      seats: car.seats,
+      transmission: car.transmission,
+      fuel: car.fuelType || car.fuel,
+      imageUrl: car.imageUrl ?? null,
+      isAvailable: car.status === "AVAILABLE" && !isUnavailableForDates,
+      rating: 4.8, // Données factices en attendant la table Review
+      reviewCount: 34,
+    };
+  });
+}
+
+/* ─────────────────────────────────────────────
+   Page
+───────────────────────────────────────────── */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export default async function HomePage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const location = params?.location;
+  const start = params?.start;
+  const end = params?.end;
+
+  const cars = await getCars(start, end);
+
   return (
-    <div className="w-full">
-      
-      {/* 2. TURO HERO BACKGROUND 
-        Updated to use your fron-img.png from the public folder
-      */}
-      <div 
-        className="w-full h-[500px] md:h-[600px] bg-cover bg-center bg-no-repeat flex flex-col items-center justify-center text-center px-4 relative"
-        style={{ backgroundImage: `url('/hero-bg.png')`, backgroundColor: '#1a1a1a' }}
-      >
-        {/* A subtle dark overlay to make the white text and search bar pop */}
-        <div className="absolute inset-0 bg-black/30 z-0"></div>
+    <Suspense fallback={<HomeSkeleton />}>
+      <StorefrontClient
+        cars={cars}
+        initialSearch={{ location, start, end }}
+      />
+    </Suspense>
+  );
+}
 
-        <div className="relative z-10 w-full flex flex-col items-center mt-8">
-          {/* Exact Turo Typography (White text over image) */}
-          <h1 className="text-[56px] md:text-[80px] font-black text-white tracking-[-0.04em] leading-none mb-4 drop-shadow-md">
-            Find your drive
-          </h1>
-          <p className="text-[18px] md:text-[24px] text-white font-semibold tracking-tight max-w-2xl mt-1 drop-shadow-md">
-            Explore the world's largest car sharing marketplace
-          </p>
-          
-          <div className="mt-10 w-full flex justify-center max-w-5xl">
-             <HeroSearch />
-          </div>
-        </div>
-      </div>
-
-      {/* CAR GRID */}
-      <div className="max-w-[2520px] mx-auto xl:px-20 md:px-10 sm:px-2 px-4 mt-16">
-        
-        {/* Added a section title for the available cars */}
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 uppercase tracking-wide">
-          Available Vehicles
-        </h2>
-
-        <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-8 pb-20">
-          
-          {vehicles.length === 0 ? (
-            <div className="col-span-full h-[30vh] flex flex-col items-center justify-center text-neutral-500">
-              <h2 className="text-2xl font-semibold text-neutral-800">No cars available right now</h2>
-              <p className="mt-2">Try changing your filters or checking back later.</p>
+/* ─────────────────────────────────────────────
+   Loading skeleton
+───────────────────────────────────────────── */
+function HomeSkeleton() {
+  return (
+    <div className="min-h-screen bg-[#F8F8F6]">
+      <div className="h-[85vh] bg-[#0A0A0A] animate-pulse" />
+      <div className="h-12 bg-[#111] animate-pulse" />
+      <div className="h-14 bg-white border-b border-black/[0.06] animate-pulse" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+        <div className="h-7 w-56 bg-black/5 rounded-lg mb-6 animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl overflow-hidden border border-black/[0.07] animate-pulse">
+              <div className="aspect-[4/3] bg-[#F0F0F0]" />
+              <div className="p-4 space-y-3">
+                <div className="h-4 bg-[#F0F0F0] rounded w-3/4" />
+                <div className="h-3 bg-[#F0F0F0] rounded w-1/2" />
+                <div className="h-3 bg-[#F0F0F0] rounded w-2/3" />
+              </div>
             </div>
-          ) : (
-            vehicles.map((vehicle: any) => (
-              <VehicleCard key={vehicle.id} data={vehicle} />
-            ))
-          )}
-
+          ))}
         </div>
       </div>
     </div>

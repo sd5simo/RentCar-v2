@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useStore } from "@/store/useStore";
-import { ArrowLeft, Edit3, Save, X, AlertTriangle, CheckCircle, Car, Wrench, Clock, Plus } from "lucide-react";
+import { ArrowLeft, Edit3, Save, X, AlertTriangle, CheckCircle, Car, Wrench, Clock, Plus, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const STATUS_CFG: Record<string, { label: string; color: string }> = {
@@ -96,7 +96,42 @@ export default function VehicleDetailPage() {
   };
 
   const F = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
-  
+// --- IMAGE UPLOAD LOGIC ---
+  // Safely parse current images from the single JSON string or fallback to standard string
+  let currentImages: string[] = [];
+  if (form.images) {
+    currentImages = form.images;
+  } else if (form.imageUrl) {
+    try { currentImages = form.imageUrl.startsWith('[') ? JSON.parse(form.imageUrl) : [form.imageUrl]; } 
+    catch { currentImages = [form.imageUrl]; }
+  }
+
+  const handleMultiImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const remainingSlots = 8 - currentImages.length;
+    const filesToProcess = files.slice(0, remainingSlots);
+
+    if (filesToProcess.length === 0) return;
+
+    Promise.all(filesToProcess.map(file => {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    })).then(newBase64Images => {
+      const updatedImages = [...currentImages, ...newBase64Images];
+      // Save it back into imageUrl as a JSON string so it saves to the DB automatically
+      setForm({ ...form, images: updatedImages, imageUrl: JSON.stringify(updatedImages) });
+    });
+  };
+
+  const removeImage = (index: number) => {
+    const updatedImages = [...currentImages];
+    updatedImages.splice(index, 1);
+    setForm({ ...form, images: updatedImages, imageUrl: JSON.stringify(updatedImages) });
+  };
+
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Header */}
@@ -193,15 +228,52 @@ export default function VehicleDetailPage() {
             </div>
             <VehicleField label="Notes" value={form.notes} onChange={F("notes")} editing={editing} />
           </div>
-          <div className="rounded-xl border border-[#21262d] bg-[#161b22] p-5 space-y-3">
-            <p className="text-sm font-bold text-slate-200 border-b border-[#21262d] pb-3">Documents</p>
-            <VehicleField label="Plaque" value={form.plate} onChange={F("plate")} editing={editing} />
-            <VehicleField label="Visite technique" value={form.technicalInspectionDate} onChange={F("technicalInspectionDate")} type="date" editing={editing} />
-            <VehicleField label="Expiration assurance" value={form.insuranceExpiry} onChange={F("insuranceExpiry")} type="date" editing={editing} />
-            <VehicleField label="Expiration vignette" value={form.vignetteExpiry} onChange={F("vignetteExpiry")} type="date" editing={editing} />
+          <div className="rounded-xl border border-[#21262d] bg-[#161b22] p-5 flex flex-col">
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-slate-200 border-b border-[#21262d] pb-3">Documents</p>
+              <VehicleField label="Plaque" value={form.plate} onChange={F("plate")} editing={editing} />
+              <VehicleField label="Visite technique" value={form.technicalInspectionDate} onChange={F("technicalInspectionDate")} type="date" editing={editing} />
+              <VehicleField label="Expiration assurance" value={form.insuranceExpiry} onChange={F("insuranceExpiry")} type="date" editing={editing} />
+              <VehicleField label="Expiration vignette" value={form.vignetteExpiry} onChange={F("vignetteExpiry")} type="date" editing={editing} />
+            </div>
+
+            {/* ✅ Tiny Photo Gallery Upload (Up to 8 Images) */}
+            <div className="mt-auto pt-6">
+              <div className="flex items-center justify-between mb-3 border-t border-[#21262d] pt-4">
+                <p className="text-xs font-bold text-slate-300">Photos ({currentImages.length}/8)</p>
+                {editing && currentImages.length < 8 && (
+                  <label className="cursor-pointer flex items-center gap-1.5 px-2 py-1.5 bg-[#1c2130] border border-brand-green-500/30 text-brand-green-400 hover:bg-brand-green-500/10 rounded-md text-[10px] font-semibold transition-colors">
+                    <Upload size={12} />
+                    Ajouter
+                    <input type="file" multiple accept="image/png, image/jpeg, image/webp" onChange={handleMultiImageUpload} className="hidden" />
+                  </label>
+                )}
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                {currentImages.map((img: string, idx: number) => (
+                  <div key={idx} className="relative w-12 h-12 rounded-md overflow-hidden border border-[#30363d] bg-[#0d1117] group flex-shrink-0">
+                    <img src={img} alt={`img-${idx}`} className="w-full h-full object-cover" />
+                    {editing && (
+                      <button onClick={() => removeImage(idx)} className="absolute top-0.5 right-0.5 bg-red-500/80 hover:bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
+                        <X size={10} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {currentImages.length === 0 && (
+                  <div className="w-full h-12 rounded-md border border-dashed border-[#30363d] flex items-center justify-center bg-[#0d1117]/50">
+                    <p className="text-[10px] text-slate-500 font-medium">Aucune photo ajoutée</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
         </div>
       )}
+      
+
 
       {/* Tab: Maintenance */}
       {tab === "maintenance" && (
@@ -235,7 +307,7 @@ export default function VehicleDetailPage() {
           )}
         </div>
       )}
-
+      
       {/* Tab: Damages */}
       {tab === "damages" && (
         <div className="space-y-3">
@@ -355,3 +427,4 @@ export default function VehicleDetailPage() {
     </div>
   );
 }
+// Inside your form component in src/app/(admin)/vehicules/[id]/page.tsx

@@ -14,7 +14,8 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+// ✅ Extracted update logic so it can be used for both PUT and PATCH requests
+async function updateVehicleData(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json();
     const updated = await prisma.vehicle.update({
@@ -45,14 +46,21 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
           ? (body.vignetteExpiry ? new Date(body.vignetteExpiry) : null)
           : undefined,
         notes: body.notes !== undefined ? body.notes : undefined,
+        
+        // ✅ Added imageUrl so the database actually saves your uploaded photos!
+        imageUrl: body.imageUrl !== undefined ? body.imageUrl : undefined, 
       },
     });
     return NextResponse.json(serializeVehicle(updated));
   } catch (err: any) {
-    console.error("[PUT /api/vehicles/id]", err);
+    console.error("[UPDATE /api/vehicles/id]", err);
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }
+
+// ✅ Export both methods to guarantee no 405 errors
+export const PUT = updateVehicleData;
+export const PATCH = updateVehicleData;
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   try {
