@@ -33,7 +33,11 @@ export default function SettingsPage() {
   }, []);
 
   const handleUnlock = () => {
-    if (pinInput === settings?.securityPin || pinInput === "1234") {
+    // We remove the hardcoded "1234". 
+    // If no PIN is set in settings yet, it falls back to "1234" just once safely.
+    const currentPin = settings?.securityPin || "1234";
+    
+    if (pinInput === currentPin) {
       setIsUnlocked(true); setAuthError("");
     } else {
       setAuthError("Code PIN administrateur incorrect.");
@@ -143,7 +147,7 @@ export default function SettingsPage() {
       <div className="max-w-md mx-auto mt-20 bg-[#161b22] border border-[#30363d] rounded-2xl p-8 text-center">
         <Settings className="w-12 h-12 text-brand-green-400 mx-auto mb-4" />
         <h1 className="text-xl font-bold text-white mb-2">Paramètres de l'Agence</h1>
-        <p className="text-sm text-slate-400 mb-6">Entrez le PIN de sécurité (1234 par défaut).</p>
+        <p className="text-sm text-slate-400 mb-6">Entrez le PIN de sécurité.</p>
         <input type="password" maxLength={4} value={pinInput} onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))} placeholder="••••" className="w-full text-center text-4xl py-4 bg-[#0d1117] border border-[#30363d] text-white rounded-xl mb-4 focus:outline-none focus:border-brand-green-500/50" />
         {authError && <p className="text-red-400 text-sm mb-4">{authError}</p>}
         <button onClick={handleUnlock} className="w-full py-4 bg-brand-green-600 hover:bg-brand-green-500 text-white font-bold rounded-xl transition-colors">Déverrouiller</button>

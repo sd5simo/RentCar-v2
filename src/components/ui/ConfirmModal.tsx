@@ -1,4 +1,6 @@
 "use client";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,9 +19,31 @@ export default function ConfirmModal({
   open, title, description, confirmLabel = "Supprimer",
   danger = true, loading = false, onConfirm, onCancel,
 }: Props) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  // Ensure the portal only renders on the client side (Next.js requirement)
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    
+    // Bonus: Prevent the user from scrolling the background while the modal is open
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [open]);
+
+  if (!open || !mounted) return null;
+
+  // Render the modal directly into the <body> tag
+  return createPortal(
+    // Increased z-index to 9999 to guarantee it sits above absolutely everything
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative bg-[#161b22] border border-[#30363d] rounded-xl p-6 w-full max-w-md shadow-2xl animate-fade-in">
         <button onClick={onCancel}
@@ -49,6 +73,7 @@ export default function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

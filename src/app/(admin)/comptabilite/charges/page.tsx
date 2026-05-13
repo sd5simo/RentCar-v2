@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Plus, Trash2, Edit2, Save, X, Wrench, Shield, Droplets, Package, Search } from "lucide-react";
 import { useStore } from "@/store";
 import { cn } from "@/lib/utils";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 const CAT: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   MAINTENANCE: { label: "Maintenance", icon: <Wrench size={12} />,  color: "text-blue-400 bg-blue-500/20 border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.2)]" },
@@ -22,6 +23,9 @@ export default function ChargesPage() {
   const [filterCat, setFilterCat] = useState("ALL");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // NEW: State to hold the ID of the expense being deleted
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   
   const [form, setForm] = useState({ category: "MAINTENANCE", description: "", amount: "", date: "", vendor: "", vehicleId: "" });
 
@@ -48,6 +52,14 @@ export default function ChargesPage() {
   const startEdit = (e: any) => {
     setForm({ category: e.category, description: e.description, amount: e.amount.toString(), date: e.date.slice(0, 10), vendor: e.vendor ?? "", vehicleId: e.vehicleId ?? "" });
     setEditingId(e.id); setShowForm(true);
+  };
+
+  // NEW: Function to handle the actual deletion after confirmation
+  const handleConfirmDelete = () => {
+    if (expenseToDelete) {
+      deleteExpense(expenseToDelete);
+      setExpenseToDelete(null); // Close the modal
+    }
   };
 
   if (!mounted) return null;
@@ -173,7 +185,10 @@ export default function ChargesPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <button onClick={() => startEdit(e)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-brand-green-400 hover:border-brand-green-500/30 hover:bg-brand-green-500/10 transition-all"><Edit2 size={14} /></button>
-                          <button onClick={() => deleteExpense(e.id)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/10 transition-all"><Trash2 size={14} /></button>
+                          
+                          {/* UPDATED: Open the modal instead of deleting immediately */}
+                          <button onClick={() => setExpenseToDelete(e.id)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/10 transition-all"><Trash2 size={14} /></button>
+                          
                         </div>
                       </td>
                     </tr>
@@ -184,6 +199,17 @@ export default function ChargesPage() {
           </div>
         )}
       </div>
+
+      {/* NEW: The Confirmation Modal */}
+      <ConfirmModal
+        open={!!expenseToDelete} // Converts string ID to true if it exists, false if null
+        title="Supprimer la dépense"
+        description="Êtes-vous sûr de vouloir supprimer cette dépense ? Cette action est irréversible."
+        confirmLabel="Supprimer"
+        danger={true}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setExpenseToDelete(null)}
+      />
     </div>
   );
 }
